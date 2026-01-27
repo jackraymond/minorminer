@@ -22,7 +22,7 @@ from math import ceil
 from minorminer._extern import rpack
 
 def p_norm(G, p=2, starting_layout=None, G_distances=None, dim=None, center=None, scale=None, **kwargs):
-    """Embeds graph ``G`` in :math:`R^d` with the p-norm and minimizes a 
+    r"""Embeds graph ``G`` in :math:`R^d` with the p-norm and minimizes a 
     Kamada-Kawai-esque objective function to achieve an embedding with low 
     distortion.
     
@@ -237,7 +237,7 @@ def _p_norm_objective(layout_vector, G_distances, dim, p):
 
 
 def dnx_layout(G, dim=None, center=None, scale=None, **kwargs):
-    """The Chimera or Pegasus or Zephyr layout from `dwave_networkx` centered at the origin
+    r"""The Chimera or Pegasus or Zephyr layout from `dwave_networkx` centered at the origin
     with ``scale`` as a function of the number of rows or columns. Note: As per 
     the implementation of `dnx.*_layout`, if :math:`dim>2`, coordinates beyond 
     the second are 0.
@@ -324,7 +324,7 @@ def dnx_layout(G, dim=None, center=None, scale=None, **kwargs):
 
 
 def _nx_to_dnx_layout(center, scale):
-    """This function translates a center and a scale from the networkx convention, 
+    r"""This function translates a center and a scale from the networkx convention, 
     :math:`[center - scale, center + scale]^{\dim}`, to the `dwave_networkx` 
     convention, :math:`[center, center-scale] x [center, center+scale]^{\(dim-1)}`.
 
@@ -342,7 +342,7 @@ def _nx_to_dnx_layout(center, scale):
 
 
 class Layout(abc.MutableMapping):
-    """Class that stores (or computes) coordinates in dimension ``dim`` for each 
+    r"""Class that stores (or computes) coordinates in dimension ``dim`` for each 
     node in graph ``G``.
 
     Args:
@@ -650,7 +650,7 @@ def _scale_layout(layout_array, new_scale, old_scale=None, center=None):
 
 
 def _set_dim_and_center(dim, center, default_dim=2):
-    """A helper function to check that a user provided dim and center match, or 
+    r"""A helper function to check that a user provided dim and center match, or 
     if no user provided dim and center exist sets default values: dim=2 and 
     center=the origin in :math:`R^{\dim}`.
     """
