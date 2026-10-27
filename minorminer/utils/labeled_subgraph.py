@@ -51,13 +51,17 @@ __all__ = [
 ]
 
 
-def get_graph_shape(graph: nx.Graph) -> None | tuple:
-    """Return the shape of a graph based on its family and metadata.
+def get_graph_shape(graph: nx.Graph) -> tuple | None:
+    """Return the shape of a graph based on its family metadata.
 
     Args:
-        graph: A NetworkX graph with family metadata.
+        graph: A NetworkX graph with ``family`` metadata (as populated by the
+            :mod:`dwave.graphs` generators).
+
     Returns:
-        A tuple representing the shape of the graph, which varies based on the graph family. If the family metadata is not found then ``None`` is returned.
+        The family-specific shape tuple: ``(rows, columns, tile)`` for Chimera,
+        ``(rows,)`` for Pegasus and ``(rows, tile)`` for Zephyr. Returns ``None``
+        if the ``family`` metadata is missing or unrecognized.
     """
     graph_family = graph.graph.get("family", None)
     if graph_family == "chimera":
@@ -76,17 +80,24 @@ def graph_label_mapping(
     label_one: Literal["int", "coordinate", "nice"],
     label_two: Literal["int", "coordinate", "nice"],
 ) -> Callable:
-    """Return a function that maps a node label of int/coordinate/nice type to another.
+    """Return a function that converts a node label between labelling schemes.
 
     Args:
-        graph_family: The family of the graph (e.g., 'chimera', 'pegasus', 'zephyr').
-        graph_shape: The shape of the graph (e.g., (m, t) for Zephyr).
-        label_one: The type of the input label (e.g., 'coordinate', 'int').
-        label_two: The type of the output label (e.g., 'coordinate', 'int').
+        graph_family: The graph family: ``'chimera'``, ``'pegasus'`` or ``'zephyr'``.
+        graph_shape: The family-specific shape tuple, as returned by
+            :func:`get_graph_shape` (e.g. ``(m, t)`` for Zephyr).
+        label_one: The input label type: ``'int'``, ``'coordinate'`` or ``'nice'``.
+        label_two: The output label type: ``'int'``, ``'coordinate'`` or ``'nice'``.
 
     Returns:
-        A function that takes a node label of type `label_one` and returns
-        the corresponding node label of type `label_two`.
+        A function that maps a node label of type ``label_one`` to the
+        corresponding node label of type ``label_two``. If ``label_one`` equals
+        ``label_two`` the identity function is returned.
+
+    Raises:
+        ValueError: If ``graph_family`` is unsupported, or if the requested
+            ``label_one`` to ``label_two`` conversion is not available for that
+            family (``'nice'`` is only supported for Pegasus).
     """
     if label_one != label_two:
         match graph_family:
@@ -133,6 +144,12 @@ def safe_find_subgraph_label(value: Hashable) -> str:
     ``find_subgraph`` requires string vertex labels and its parser rejects labels
     containing whitespace, so the value is stringified and percent-encoded,
     leaving letters, digits and punctuation intact while escaping whitespace.
+
+    Args:
+        value: Any hashable label to convert.
+
+    Returns:
+        The percent-encoded string form of ``value``.
     """
     safe_list = string.ascii_letters + string.digits + string.punctuation
     return urllib.parse.quote(str(value), safe=safe_list)
@@ -225,11 +242,13 @@ def node_labels_by_coloring(
             :mod:`dwave.graphs` generators) and used to select a family-specific
             coloring method where available. The function will fall back to a bipartite
             coloring approach if the family is not recognized.
+
+    Returns:
+        A dictionary mapping graph nodes to string color labels.
+
     Raises:
         ValueError: If the bipartite coloring fallback is used and the graph is
             not bipartite.
-    Returns:
-        A dictionary mapping graph nodes to string color labels.
     """
     graph_family = graph.graph.get("family", None)
     graph_labels = graph.graph.get("labels", None)
@@ -397,12 +416,24 @@ def find_labeled_subgraph(
             to ``True``.
         **kwargs: Additional keyword arguments to pass to find_subgraph.
             Use of a timeout > 0 is recommended.
+
+    Returns:
+        A dictionary mapping source nodes to target nodes. An empty dictionary
+        is returned if no color-preserving subgraph isomorphism is found.
+
+    Raises:
+        ValueError: If ``labeling_method`` is not one of ``'orientation'``,
+            ``'quotient'`` or ``'coloring'``; if ``labeling_method='quotient'``
+            and the source and target graph families do not match; or if a
+            labeling method's own requirements are violated (see the referenced
+            ``node_labels_by_*`` functions).
     """
     if node_labels is None:
         match labeling_method:
             case "orientation":
-                node_labels = tuple(
-                    node_labels_by_orientation(G) for G in (source, target)
+                node_labels = (
+                    node_labels_by_orientation(source),
+                    node_labels_by_orientation(target),
                 )
             case "quotient":
                 source_family = source.graph.get("family")
@@ -413,15 +444,18 @@ def find_labeled_subgraph(
                         "coloring"
                     )
                 # Supported-family validation is left to node_labels_by_quotient.
-                node_labels = tuple(
+                node_labels = (
                     node_labels_by_quotient(
-                        G, expand_boundary_search=expand_boundary_search
-                    )
-                    for G in (source, target)
+                        source, expand_boundary_search=expand_boundary_search
+                    ),
+                    node_labels_by_quotient(
+                        target, expand_boundary_search=expand_boundary_search
+                    ),
                 )
             case "coloring":
-                node_labels = tuple(
-                    node_labels_by_coloring(G) for G in (source, target)
+                node_labels = (
+                    node_labels_by_coloring(source),
+                    node_labels_by_coloring(target),
                 )
             case _:
                 raise ValueError(f"Unknown coloring method {labeling_method}")
